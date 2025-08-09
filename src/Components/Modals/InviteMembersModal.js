@@ -15,7 +15,7 @@ function DebounceSelect({
   const [fetching, setFetching] = useState(false);
   const [options, setOptions] = useState([]);
 
-  const debounceFetcher = React.useMemo(() => {
+  const debounceFetcher = useMemo(() => {
     const loadOptions = (value) => {
       setOptions([]);
       setFetching(true);
@@ -29,7 +29,7 @@ function DebounceSelect({
     return debounce(loadOptions, debounceTimeout);
   }, [debounceTimeout, fetchOptions, curMembers]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       // clear when unmount
       setOptions([]);

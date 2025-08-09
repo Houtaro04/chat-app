@@ -107,7 +107,7 @@ export default function ChatWindow() {
         }
     };
 
-    const condition = React.useMemo(
+    const condition = useMemo(
         () => ({
         fieldName: 'roomId',
         operator: '==',
