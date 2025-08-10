@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.0.0",
     "antd": "^5.26.7",
     "date-fns": "^4.1.0",
     "firebase": "^12.1.0",
