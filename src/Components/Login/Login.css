@@ -1,0 +1,27 @@
+.social-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  color: white;
+  border: none;
+  height: 40px;
+  margin: 5px;
+}
+
+.google-btn {
+  background-color: #db4437;
+}
+
+.facebook-btn {
+  background-color: #3b5998;
+}
+
+.social-login-button:hover {
+  opacity: 0.9;
+}
+
+.social-login-button .icon {
+  font-size: 18px;
+  margin-right: 8px;
+}
