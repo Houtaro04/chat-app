@@ -1,13 +1,13 @@
 import React from "react";
 import {Row, Col} from 'antd';
-import ChatWindow from "./ChatWindow";
-import Sidebar from "./Sidebar";
+import ChatWindow from "./ChatWindow.jsx";
+import SideBar from "./SideBar.jsx";
 
 export default function ChatRoom() {
   return (
         <Row>
           <Col span={6}>
-            <Sidebar />
+            <SideBar />
           </Col>
           <Col span={18}>
             <ChatWindow />
