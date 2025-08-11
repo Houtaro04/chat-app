@@ -1,5 +1,5 @@
 import { Avatar, Typography } from "antd";
-import { formatRelative } from "date-fns/fp";
+import { format } from 'date-fns';
 import React from "react";
 import styled from "styled-components";
 
@@ -57,16 +57,25 @@ const WrapperStyled = styled.div`
   }
 `;
 
-function formatDate(seconds) {
-  if (!seconds) return "";
-  const s = formatRelative(new Date(seconds * 1000), new Date());
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function formatDate(createdAt, clientTime) {
+  let date;
+  if (createdAt?.toDate) {
+    date = createdAt.toDate(); // Firestore Timestamp
+  } else if (typeof createdAt?.seconds === 'number') {
+    date = new Date(createdAt.seconds * 1000);
+  } else if (clientTime) {
+    date = new Date(clientTime); // fallback
+  } else {
+    return '';
+  }
+  return format(date, ' dd/MM/yyyy - HH:mm');
 }
 
 export default function Message({
   text,
   displayName,
   createdAt,
+  clientTime,
   photoURL,
   isOwnMessage,
 }) {
@@ -103,7 +112,7 @@ export default function Message({
       </div>
 
       {/* Box 3: Ngày/giờ */}
-      <div className="time-box">{formatDate(createdAt?.seconds)}</div>
+      <div className="time-box">{formatDate(createdAt, clientTime)}</div>
     </WrapperStyled>
   );
 }

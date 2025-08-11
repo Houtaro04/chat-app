@@ -1,10 +1,12 @@
 import { db, firebase } from './config'; // Đảm bảo đường dẫn đúng tới config.js
+import 'firebase/compat/firestore';
 export const addDocument = (collection, data) => {
     const query = db.collection(collection);
 
     query.add({
         ...data,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        clientTime: Date.now(),
     })
 }
 

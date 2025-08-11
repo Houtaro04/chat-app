@@ -195,6 +195,7 @@ export default function ChatWindow() {
                     photoURL={mes.photoURL}
                     displayName={mes.displayName}
                     createdAt={mes.createdAt}
+                    clientTime={mes.clientTime}     
                     isOwnMessage={mes.uid === user?.uid}
                     />
                 ))}

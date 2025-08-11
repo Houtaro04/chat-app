@@ -5,7 +5,7 @@ import { useState } from 'react';
 export const useFirestore = (collection, condition) => {
     const [documents, setDocuments] = useState([]);
     useEffect(() => {
-      let collectionRef = db.collection(collection).orderBy('createdAt');
+      let collectionRef = db.collection(collection).orderBy('createdAt', 'asc');
       if(condition){
         if(!condition.compareValue || !condition.compareValue.length) {
             return; 
