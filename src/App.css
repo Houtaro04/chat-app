@@ -36,3 +36,18 @@
     transform: rotate(360deg);
   }
 }
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+#root {
+  height: 100%;
+}
+
+.app-container { /* div bọc toàn bộ app */
+  display: flex;
+  height: 100vh;
+}
+
