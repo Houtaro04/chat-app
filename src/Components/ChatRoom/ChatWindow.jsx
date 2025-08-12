@@ -19,6 +19,7 @@ const HeaderStyled = styled.div`
   align-items:center; border-bottom:1px solid rgba(230,230,230); background:#bcb88a;
   .header{ &__info{display:flex; flex-direction:column; justify-content:center;}
     &__title{margin:0; font-weight:bold;} &__description{font-size:12px;} }
+  border-radius: 10px;
 `;
 const ButtonGroupStyled = styled.div`display:flex; align-items:center;`;
 const ContentStyled = styled.div`height:calc(100vh - 85px); display:flex; flex-direction:column; padding:11px; justify-content:flex-end;`;
@@ -167,75 +168,77 @@ export default function ChatWindow() {
         <WrapperStyled>
         {selectedRoom.id ? (
             <>
-            <HeaderStyled>
-                <div className="header__info">
-                <p className="header__title">{selectedRoom.name}</p>
-                <span className="header__description">{selectedRoom.description}</span>
+                <div style={{backgroundColor: 'black', padding: '5px'}}>
+                    <HeaderStyled>
+                        <div className="header__info">
+                        <p className="header__title">{selectedRoom.name}</p>
+                        <span className="header__description">{selectedRoom.description}</span>
+                        </div>
+                        <ButtonGroupStyled>
+                        <Button icon={<UserAddOutlined />} type="text" onClick={() => setIsInviteMemberVisible(true)}>Mời</Button>
+                        <Avatar.Group size="small" max={{ count: 2 }}>
+                            {members.map(member => (
+                            <Tooltip title={member.displayName} key={member.id}>
+                                <Avatar src={member.photoURL}>
+                                {member.photoURL ? "" : member.displayName?.charAt(0)?.toUpperCase()}
+                                </Avatar>
+                            </Tooltip>
+                            ))}
+                        </Avatar.Group>
+                        </ButtonGroupStyled>
+                    </HeaderStyled>
+
+                    <ContentStyled style={{backgroundColor: 'white', borderRadius: '10px'}}>
+                        <MessageListStyled ref={messageListRef}>
+                        {messages.map(mes => (
+                            <Message
+                            key={mes.id}
+                            text={mes.text}
+                            photoURL={mes.photoURL}
+                            displayName={mes.displayName}
+                            createdAt={mes.createdAt}
+                            clientTime={mes.clientTime}     
+                            isOwnMessage={mes.uid === user?.uid}
+                            />
+                        ))}
+                        </MessageListStyled>
+
+                        <FormStyled form={form}>
+                        <Button
+                            ref={emojiBtnRef}
+                            type="text"
+                            onClick={openEmojiPicker}
+                            aria-label="Insert emoji"
+                        >😊</Button>
+
+                        <FormItem name="message" style={{ flex: 1, marginBottom: 0 }}>
+                            <Input
+                            ref={inputRef}
+                            variant={false}
+                            autoComplete="off"
+                            placeholder="Aa"
+                            value={inputValue}
+                            onChange={handleInputChange}
+                            onPressEnter={(e) => {
+                                if (!e.shiftKey) { e.preventDefault(); handleOnSubmit(); }
+                            }}
+                            />
+                        </FormItem>
+
+                        <Button type="primary" onClick={() => handleOnSubmit()}>
+                            Gửi
+                        </Button>
+
+                        </FormStyled>
+
+                        <EmojiPortal
+                        open={openEmoji}
+                        pos={pickerPos}
+                        onPick={(e) => { insertEmoji(e); setOpenEmoji(false); }}
+                        onClose={() => setOpenEmoji(false)}
+                        />
+                    </ContentStyled>
                 </div>
-                <ButtonGroupStyled>
-                <Button icon={<UserAddOutlined />} type="text" onClick={() => setIsInviteMemberVisible(true)}>Mời</Button>
-                <Avatar.Group size="small" max={{ count: 2 }}>
-                    {members.map(member => (
-                    <Tooltip title={member.displayName} key={member.id}>
-                        <Avatar src={member.photoURL}>
-                        {member.photoURL ? "" : member.displayName?.charAt(0)?.toUpperCase()}
-                        </Avatar>
-                    </Tooltip>
-                    ))}
-                </Avatar.Group>
-                </ButtonGroupStyled>
-            </HeaderStyled>
-
-            <ContentStyled>
-                <MessageListStyled ref={messageListRef}>
-                {messages.map(mes => (
-                    <Message
-                    key={mes.id}
-                    text={mes.text}
-                    photoURL={mes.photoURL}
-                    displayName={mes.displayName}
-                    createdAt={mes.createdAt}
-                    clientTime={mes.clientTime}     
-                    isOwnMessage={mes.uid === user?.uid}
-                    />
-                ))}
-                </MessageListStyled>
-
-                <FormStyled form={form}>
-                <Button
-                    ref={emojiBtnRef}
-                    type="text"
-                    onClick={openEmojiPicker}
-                    aria-label="Insert emoji"
-                >😊</Button>
-
-                <FormItem name="message" style={{ flex: 1, marginBottom: 0 }}>
-                    <Input
-                    ref={inputRef}
-                    variant={false}
-                    autoComplete="off"
-                    placeholder="Aa"
-                    value={inputValue}
-                    onChange={handleInputChange}
-                    onPressEnter={(e) => {
-                        if (!e.shiftKey) { e.preventDefault(); handleOnSubmit(); }
-                    }}
-                    />
-                </FormItem>
-
-                <Button type="primary" onClick={() => handleOnSubmit()}>
-                    Gửi
-                </Button>
-
-                </FormStyled>
-
-                <EmojiPortal
-                open={openEmoji}
-                pos={pickerPos}
-                onPick={(e) => { insertEmoji(e); setOpenEmoji(false); }}
-                onClose={() => setOpenEmoji(false)}
-                />
-            </ContentStyled>
             </>
         ) : (
             <Alert message="Chọn phòng để được chat" type="info" showIcon style={{ margin: 5 }} closable />
