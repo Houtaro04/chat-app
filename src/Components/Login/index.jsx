@@ -5,6 +5,7 @@ import { auth } from '../../firebase/config'; // đường dẫn đúng tới co
 import '../../Components/Login/Login.css'; // Đảm bảo bạn đã tạo file CSS này để định dạng nút đăng nhập
 import { GoogleOutlined, FacebookOutlined } from '@ant-design/icons';
 import { addDocument, generateKeywords } from '../../firebase/services';
+import logo from '../../assets/logo.png'
 
 const { Title } = Typography;
 
@@ -39,7 +40,7 @@ export default function Login() {
                         paddingBottom: 40,
                     }}
                 >
-                    <Title style={{ textAlign: 'center', backgroundColor: '#a3b18a', color: 'white', height: '45px', borderRadius: '10px' }} level={3}>Đăng nhập</Title>
+                    <img src={logo} style={{ width: '200px', height: '50px', borderRadius: '10px', paddingLeft: '40px' }} level={3}></img>
                     <Button className="social-login-button google-btn" onClick={() => handleLogin(googleProvider)}> 
                         <GoogleOutlined />
                         Login with Google

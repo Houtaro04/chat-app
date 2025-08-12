@@ -168,7 +168,7 @@ export default function ChatWindow() {
         <WrapperStyled>
         {selectedRoom.id ? (
             <>
-                <div style={{backgroundColor: 'black', padding: '5px'}}>
+                <div style={{backgroundColor: 'black', paddingLeft: '5px', paddingRight: '5px'}}>
                     <HeaderStyled>
                         <div className="header__info">
                         <p className="header__title">{selectedRoom.name}</p>
