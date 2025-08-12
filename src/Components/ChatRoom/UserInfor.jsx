@@ -2,15 +2,16 @@
 import React, { useContext } from "react";
 import { auth } from "../../firebase/config"; // Adjust the import path as necessary
 import { AuthContext } from "../../Context/AuthProvider";
-import { Dropdown, Menu, Avatar, Space } from "antd";
+import { Dropdown, Menu, Avatar, Space, Typography } from "antd";
 import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import styled from "styled-components";
 
 const WrapperStyle = styled.div`
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    margin-top: auto;
     padding: 12px 16px;
-    border-bottom: 1px solid rgba(82, 38, 83);
+    border-top: 1px solid rgba(82, 38, 83);
 
     .username{
         color: white;
@@ -23,35 +24,28 @@ export default function UserInfor() {
         console.log("Đăng xuất");
         auth.signOut();
     }
-      const { user: {
+    
+    const { user: {
       displayName, 
       photoURL
     } } = useContext(AuthContext);
-    const menu = (
-      <Menu>
-        <Menu.Item
-          key="logout"
-          icon={<LogoutOutlined />}
-          onClick={handleLogout}
-        >
-          Đăng xuất
-        </Menu.Item>
-      </Menu>
-    );
+
+    const initial = displayName?.charAt(0)?.toUpperCase() || "";
+
+    const items = [
+      {
+        key: 'logout',
+        icon: <LogoutOutlined />,
+        label: "Đăng xuất"
+      }
+    ]
     return (
-    // <WrapperStyle>
-    //   <div>
-    //     <Avatar src={photoURL}>{photoURL ? '' : displayName?.charAt(0)?.toUpperCase()}</Avatar>
-    //     <Typography.Text style={{ color: 'white', marginLeft: '5px' }}>{displayName}</Typography.Text>
-    //   </div>
-    //   <Button ghost style={{borderRadius: '15px', textDecoration: 'bold'}} onClick={handleLogout}>Đăng xuất</Button>
-    // </WrapperStyle>
     <WrapperStyle>
       <div>
-        <Dropdown overlay={menu} trigger={["click"]} placement="bottomLeft">
-          <Space style={{ cursor: "pointer", padding: '5px'}}>
-            <Avatar icon={<UserOutlined />} />
-            {displayName}
+        <Dropdown menu={{items, onClick: ({key}) => key === "logout" && handleLogout()}} trigger={["click"]} placement="bottomLeft">
+          <Space style={{ cursor: "pointer"}}>
+            <Avatar src={photoURL}>{!photoURL && initial}</Avatar>
+            <Typography.Text className="username">{displayName}</Typography.Text>
           </Space>
         </Dropdown>
       </div>

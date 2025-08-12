@@ -1,20 +1,29 @@
 import React from "react"
-import { Row, Col } from 'antd';
+import { Row, Col, Button } from 'antd';
 import UserInfor from "./UserInfor";
 import RoomList from "./RoomList";
 import styled from "styled-components";
+import logo from '../../assets/logo.png'
+
 
 const SidebarStyle = styled.div`
+    display: flex;
     background-color: #355e3b;
     color: white;
-    height: 100vh;
+    height: 100%;
+    flex-direction: column
 `;
 export default function Sidebar() {
     return (
         <SidebarStyle>
-            <Row>
-                <Col span={24}><UserInfor /></Col>
-                <Col span={24}><RoomList /></Col>
+            <Row style={{height: '100vh'}}>
+                <Col span={24} style={{height: '10%', borderBottom: '1px solid rgba(82, 38, 83)'}}>
+                    <Button style={{padding: '10px',top: '15px'}} type="text" onClick={() => window.location.assign('/')}>
+                        <img src={logo} style={{width: '100%'}} />
+                    </Button>
+                </Col>
+                <Col span={24} flex="auto" style={{ overflow: "auto",height: '80%' }}><RoomList /></Col>
+                <Col span={24} style={{height: '10%'}}><UserInfor /></Col>
             </Row>
         </SidebarStyle>
     );
