@@ -30,7 +30,7 @@ export default function Login() {
 
     return (
         <div style={{ padding: '10%', justifyContent: 'center' }}>
-            <Row justify="center" style={{ height: '400px', backgroundColor: '#588157' }}>
+            <Row justify="center" style={{ height: '400px', backgroundColor: '#a3ab6f' }}>
                 <Col
                     span={8}
                     style={{
@@ -40,7 +40,7 @@ export default function Login() {
                         paddingBottom: 40,
                     }}
                 >
-                    <img src={logo} style={{ width: '200px', height: '50px', borderRadius: '10px', paddingLeft: '40px' }} level={3}></img>
+                    <img src={logo} style={{ width: '200px', height: '50px', borderRadius: '10px', display: 'flex', marginLeft: 'auto', marginRight: 'auto'}} level={3}></img>
                     <Button className="social-login-button google-btn" onClick={() => handleLogin(googleProvider)}> 
                         <GoogleOutlined />
                         Login with Google

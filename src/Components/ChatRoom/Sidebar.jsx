@@ -8,7 +8,7 @@ import logo from '../../assets/logo.png'
 
 const SidebarStyle = styled.div`
     display: flex;
-    background-color: #355e3b;
+    background-color: #a3ab6f;
     color: white;
     height: 100%;
     flex-direction: column
@@ -18,8 +18,8 @@ export default function Sidebar() {
         <SidebarStyle>
             <Row style={{height: '100vh'}}>
                 <Col span={24} style={{height: '10%', borderBottom: '1px solid rgba(82, 38, 83)'}}>
-                    <Button style={{padding: '10px',top: '15px'}} type="text" onClick={() => window.location.assign('/')}>
-                        <img src={logo} style={{width: '100%'}} />
+                    <Button style={{padding: '10px', top: '15px'}} type="text" onClick={() => window.location.assign('/')}>
+                        <img src={logo} style={{width: 'auto', height: '50px', display: 'flex', marginRight: "auto", marginLeft: 'auto'}} />
                     </Button>
                 </Col>
                 <Col span={24} flex="auto" style={{ overflow: "auto",height: '80%' }}><RoomList /></Col>

@@ -15,8 +15,13 @@ import { createPortal } from "react-dom";
 
 const WrapperStyled = styled.div`height:100vh;`;
 const HeaderStyled = styled.div`
-  display:flex; justify-content:space-between; height:60px; padding:0 16px;
-  align-items:center; border-bottom:1px solid rgba(230,230,230); background:#bcb88a;
+  display:flex; 
+  justify-content:space-between; 
+  height:60px; 
+  padding:0 16px;
+  align-items:center; 
+  border-bottom:1px solid rgba(230,230,230); 
+  background: #ebe7e1;
   .header{ &__info{display:flex; flex-direction:column; justify-content:center;}
     &__title{margin:0; font-weight:bold;} &__description{font-size:12px;} }
   border-radius: 10px;

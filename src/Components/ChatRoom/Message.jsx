@@ -45,8 +45,8 @@ const WrapperStyled = styled.div`
 
     ${(p) =>
       p.$isOwn
-        ? `background:#9fe8a3; border-bottom-right-radius:0;`
-        : `background:#f1f0f0; border-bottom-left-radius:0;`}
+        ? `background: #e89fc6ff; border-bottom-right-radius:0;`
+        : `background: #f1f0f0; border-bottom-left-radius:0;`}
   }
 
   .time-box {
