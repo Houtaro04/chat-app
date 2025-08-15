@@ -1,10 +1,10 @@
-import { Avatar, Typography, Dropdown } from "antd";
-import { format } from "date-fns";
+import { Avatar, Typography, Dropdown, Image } from "antd";
+import { format } from 'date-fns';
 import React from "react";
 import styled from "styled-components";
-import { MoreOutlined, UndoOutlined } from "@ant-design/icons";
+import { MoreOutlined, UndoOutlined, UserOutlined } from "@ant-design/icons";
 import firebase from "firebase/compat/app";
-import { db } from "../../firebase/config"; // nhớ chỉnh đúng path nếu khác
+import { db } from "../../firebase/config";
 
 const AVATAR = 32;
 const GAP = 8;
@@ -14,8 +14,8 @@ const WrapperStyled = styled.div`
   flex-direction: column;
   margin-bottom: 12px;
   width: 100%;
-  align-items: flex-start; /* người khác: trái */
-  ${(p) => p.$isOwn && `align-items: flex-end;`} /* của mình: phải */
+  align-items: flex-start;
+  ${(p) => p.$isOwn && `align-items: flex-end;`}
 
   .name-box {
     font-size: 12px;
@@ -44,19 +44,24 @@ const WrapperStyled = styled.div`
     box-shadow: 0 1px 2px rgba(0,0,0,0.08);
     word-break: break-word;
     white-space: pre-wrap;
-
     ${(p) =>
       p.$isOwn
-        ? `background: #e89fc6ff; border-bottom-right-radius:0;`
-        : `background: #f1f0f0; border-bottom-left-radius:0;`}
+        ? `background:#e89fc6ff; border-bottom-right-radius:0;`
+        : `background:#f1f0f0; border-bottom-left-radius:0;`}
   }
 
-  /* trạng thái đã thu hồi */
+  .message-content.has-image {
+    padding: 4px;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 12px;
+  }
+
   .message-content.recalled {
     background: #e5e7eb;
     color: #6b7280;
     font-style: italic;
-    border-bottom-right-radius: 14px; /* bo lại cho đẹp */
+    border-bottom-right-radius: 14px;
     border-bottom-left-radius: 14px;
   }
 
@@ -70,69 +75,57 @@ const WrapperStyled = styled.div`
 
 function formatDate(createdAt, clientTime) {
   let date;
-  if (createdAt?.toDate) {
-    date = createdAt.toDate(); // Firestore Timestamp
-  } else if (typeof createdAt?.seconds === "number") {
-    date = new Date(createdAt.seconds * 1000);
-  } else if (clientTime) {
-    date = new Date(clientTime); // fallback
-  } else {
-    return "";
-  }
-  return format(date, " dd/MM/yyyy - HH:mm");
+  if (createdAt?.toDate) date = createdAt.toDate();
+  else if (typeof createdAt?.seconds === 'number') date = new Date(createdAt.seconds * 1000);
+  else if (clientTime) date = new Date(clientTime);
+  else return '';
+  return format(date, ' dd/MM/yyyy - HH:mm');
 }
 
 export default function Message({
-  id,                 // 👈 cần để update
+  id,
   text,
+  imageUrl,        // 👈 ảnh
+  imageName,
   displayName,
   createdAt,
   clientTime,
   photoURL,
   isOwnMessage,
-  isRecalled = false, // 👈 thêm prop này
-  roomId,             // nếu bạn dùng sub-collection rooms/{roomId}/messages, truyền vào để update đúng path
+  isRecalled = false,
+  roomId,          // nếu bạn dùng subcollection, có thể truyền vào
 }) {
   const initial = displayName?.charAt(0)?.toUpperCase() || "";
-  const sidePad = AVATAR + GAP; // 40px
+  const sidePad = AVATAR + GAP;
 
-  // 👇 Thu hồi tin nhắn
   const handleRecall = async () => {
-    let docRef = db.collection("messages").doc(id); // top-level
-
-    // Nếu bạn lưu theo rooms/{roomId}/messages:
+    let ref = db.collection("messages").doc(id);
     if (roomId) {
-      docRef = db
-        .collection("rooms")
-        .doc(roomId)
-        .collection("messages")
-        .doc(id);
+      ref = db.collection("rooms").doc(roomId).collection("messages").doc(id);
     }
-
-    await docRef.update({
-      isRecalled: true,
-      text: "",
-      recalledAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    await ref.set(
+      {
+        isRecalled: true,
+        text: "",
+        imageUrl: "", // ẩn ảnh khi đã thu hồi
+        recalledAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
   };
 
-  const menuItems = [
-    { key: "recall", icon: <UndoOutlined />, label: "Thu hồi tin nhắn" },
-  ];
+  const menuItems = [{ key: "recall", icon: <UndoOutlined />, label: "Thu hồi tin nhắn" }];
+
+  const contentClass =
+    (isRecalled && "message-content recalled") ||
+    (imageUrl ? "message-content has-image" : "message-content");
 
   return (
     <WrapperStyled $isOwn={isOwnMessage}>
-      {/* Box 1: Tên – chỉ hiện với tin của người khác */}
       {!isOwnMessage && (
         <div
           className="name-box"
-          style={{
-            paddingLeft: sidePad,
-            paddingRight: 0,
-            lineHeight: 1,
-            fontWeight: 600,
-            marginBottom: 4,
-          }}
+          style={{ paddingLeft: sidePad, lineHeight: 1, fontWeight: 600, marginBottom: 4 }}
           title={displayName}
         >
           <Typography.Text strong style={{ fontSize: 12, whiteSpace: "nowrap" }}>
@@ -141,35 +134,39 @@ export default function Message({
         </div>
       )}
 
-      {/* Box 2: Avatar + Nội dung (+ nút ...) */}
       <div className="content-box">
-        <Avatar className="avatar" size={AVATAR} src={photoURL}>
-          {photoURL ? "" : initial}
+        <Avatar className="avatar" size={AVATAR} src={photoURL} icon={!photoURL && <UserOutlined />}>
+          {!photoURL && initial}
         </Avatar>
 
-        <div className={`message-content ${isRecalled ? "recalled" : ""}`}>
-          {isRecalled ? "Tin nhắn đã được thu hồi" : text}
+        <div className={contentClass}>
+          {isRecalled ? (
+            "Tin nhắn đã được thu hồi"
+          ) : imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={imageName || "image"}
+              width={220}
+              style={{ display: "block", borderRadius: 12 }}
+            />
+          ) : (
+            text
+          )}
         </div>
 
-        {/* nút ... chỉ hiện với tin của mình & chưa thu hồi */}
         {isOwnMessage && !isRecalled && (
           <Dropdown
             trigger={["click"]}
             placement={isOwnMessage ? "bottomRight" : "bottomLeft"}
-            menu={{
-              items: menuItems,
-              onClick: ({ key }) => key === "recall" && handleRecall(),
-            }}
+            menu={{ items: menuItems, onClick: ({ key }) => key === "recall" && handleRecall() }}
           >
-            {/* trigger PHẢI là 1 phần tử */}
-            <span style={{ cursor: "pointer", padding: "0 4px" }} aria-label="More">
+            <span style={{ cursor: "pointer", padding: "0 4px" }}>
               <MoreOutlined />
             </span>
           </Dropdown>
         )}
       </div>
 
-      {/* Box 3: Ngày/giờ */}
       <div className="time-box">{formatDate(createdAt, clientTime)}</div>
     </WrapperStyled>
   );
