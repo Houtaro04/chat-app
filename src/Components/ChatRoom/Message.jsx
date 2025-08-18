@@ -1,5 +1,5 @@
 import { Avatar, Typography, Dropdown, Image } from "antd";
-import { format } from 'date-fns';
+import { format } from "date-fns";
 import React from "react";
 import styled from "styled-components";
 import { MoreOutlined, UndoOutlined, UserOutlined } from "@ant-design/icons";
@@ -37,6 +37,7 @@ const WrapperStyled = styled.div`
     flex: 0 0 32px;
   }
 
+  /* Bubble text */
   .message-content {
     display: inline-block;
     padding: 8px 12px;
@@ -50,13 +51,16 @@ const WrapperStyled = styled.div`
         : `background:#f1f0f0; border-bottom-left-radius:0;`}
   }
 
-  .message-content.has-image {
+  /* Khung media (ảnh/video) */
+  .media-box {
+    display: inline-block;
     padding: 4px;
     background: transparent;
     box-shadow: none;
     border-radius: 12px;
   }
 
+  /* Tin đã thu hồi */
   .message-content.recalled {
     background: #e5e7eb;
     color: #6b7280;
@@ -76,24 +80,26 @@ const WrapperStyled = styled.div`
 function formatDate(createdAt, clientTime) {
   let date;
   if (createdAt?.toDate) date = createdAt.toDate();
-  else if (typeof createdAt?.seconds === 'number') date = new Date(createdAt.seconds * 1000);
+  else if (typeof createdAt?.seconds === "number") date = new Date(createdAt.seconds * 1000);
   else if (clientTime) date = new Date(clientTime);
-  else return '';
-  return format(date, ' dd/MM/yyyy - HH:mm');
+  else return "";
+  return format(date, " dd/MM/yyyy - HH:mm");
 }
 
 export default function Message({
   id,
   text,
-  imageUrl,        // 👈 ảnh
+  imageUrl,
   imageName,
+  videoUrl,       // 👈 thêm
+  videoName,      // 👈 thêm (tuỳ dùng)
   displayName,
   createdAt,
   clientTime,
   photoURL,
   isOwnMessage,
   isRecalled = false,
-  roomId,          // nếu bạn dùng subcollection, có thể truyền vào
+  roomId,         // dùng nếu bạn lưu theo subcollection rooms/{roomId}/messages
 }) {
   const initial = displayName?.charAt(0)?.toUpperCase() || "";
   const sidePad = AVATAR + GAP;
@@ -107,18 +113,18 @@ export default function Message({
       {
         isRecalled: true,
         text: "",
-        imageUrl: "", // ẩn ảnh khi đã thu hồi
+        // xoá trường media để ẩn ngay
+        imageUrl: firebase.firestore.FieldValue.delete(),
+        videoUrl: firebase.firestore.FieldValue.delete(),
         recalledAt: firebase.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
   };
 
-  const menuItems = [{ key: "recall", icon: <UndoOutlined />, label: "Thu hồi tin nhắn" }];
-
-  const contentClass =
-    (isRecalled && "message-content recalled") ||
-    (imageUrl ? "message-content has-image" : "message-content");
+  const menuItems = [
+    { key: "recall", icon: <UndoOutlined />, label: "Thu hồi tin nhắn" },
+  ];
 
   return (
     <WrapperStyled $isOwn={isOwnMessage}>
@@ -139,20 +145,41 @@ export default function Message({
           {!photoURL && initial}
         </Avatar>
 
-        <div className={contentClass}>
-          {isRecalled ? (
-            "Tin nhắn đã được thu hồi"
-          ) : imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={imageName || "image"}
-              width={220}
-              style={{ display: "block", borderRadius: 12 }}
-            />
-          ) : (
-            text
-          )}
-        </div>
+        {/* Nội dung */}
+        {isRecalled ? (
+          <div className="message-content recalled">Tin nhắn đã được thu hồi</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {/* Ảnh (nếu có) */}
+            {imageUrl && (
+              <div className="media-box">
+                <a href={imageUrl} target="_blank" rel="noreferrer">
+                  <Image
+                    src={imageUrl}
+                    alt={imageName || "image"}
+                    width={240}
+                    style={{ display: "block", borderRadius: 12 }}
+                    placeholder
+                  />
+                </a>
+              </div>
+            )}
+
+            {/* Video (nếu có) */}
+            {videoUrl && (
+              <div className="media-box">
+                <video
+                  controls
+                  src={videoUrl}
+                  style={{ width: 260, maxWidth: "80vw", borderRadius: 10, display: "block" }}
+                />
+              </div>
+            )}
+
+            {/* Text (nếu có) */}
+            {text && <div className="message-content">{text}</div>}
+          </div>
+        )}
 
         {isOwnMessage && !isRecalled && (
           <Dropdown

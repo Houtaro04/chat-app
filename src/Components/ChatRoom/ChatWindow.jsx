@@ -1,5 +1,13 @@
-import { UserAddOutlined, PictureOutlined } from "@ant-design/icons";
-import { Alert, Avatar, Input, Tooltip, Button, Progress, Modal, Upload, message as antdMessage } from "antd";
+import {
+  UserAddOutlined,
+  PictureOutlined,
+  VideoCameraOutlined,
+  PaperClipOutlined,
+} from "@ant-design/icons";
+import {
+  Alert, Avatar, Input, Tooltip, Button, Progress, Modal, Upload,
+  Dropdown, Space, message as antdMessage
+} from "antd";
 import React, { useContext, useState, useEffect, useRef, useMemo } from "react";
 import styled from "styled-components";
 import FormItem from "antd/es/form/FormItem";
@@ -16,18 +24,10 @@ import emojiData from "@emoji-mart/data";
 
 const WrapperStyled = styled.div`height:100vh;`;
 const HeaderStyled = styled.div`
-  display:flex;
-  justify-content:space-between;
-  height:60px;
-  padding:0 16px;
-  align-items:center;
-  border-bottom:1px solid rgb(230,230,230);
-  background:#ebe7e1;
-  .header{
-    &__info{display:flex; flex-direction:column; justify-content:center;}
-    &__title{margin:0; font-weight:bold;}
-    &__description{font-size:12px;}
-  }
+  display:flex; justify-content:space-between; height:60px; padding:0 16px;
+  align-items:center; border-bottom:1px solid rgb(230,230,230); background:#ebe7e1;
+  .header{ &__info{display:flex; flex-direction:column; justify-content:center;}
+    &__title{margin:0; font-weight:bold;} &__description{font-size:12px;} }
   border-radius:10px;
 `;
 const ButtonGroupStyled = styled.div`display:flex; align-items:center; gap:6px;`;
@@ -39,155 +39,101 @@ const FormStyled = styled(Form)`
 `;
 const MessageListStyled = styled.div`max-height:100%; overflow-y:auto;`;
 
-/* ===================== EMOJI (Virtualized Grid) ===================== */
+/* ============== Emoji ============== */
 const EMOJI_MAP = emojiData?.emojis ?? emojiData ?? {};
 const toNative = (unified) => {
   if (typeof unified !== "string") return null;
-  try {
-    const cps = unified.split("-").map((u) => parseInt(u, 16));
-    return String.fromCodePoint(...cps);
-  } catch { return null; }
+  try { return String.fromCodePoint(...unified.split("-").map(u=>parseInt(u,16))); }
+  catch { return null; }
 };
 const EMOJIS = Object.values(EMOJI_MAP)
-  .map((e) => toNative(e?.skins?.[0]?.unified ?? e?.unified ?? null))
+  .map(e => toNative(e?.skins?.[0]?.unified ?? e?.unified ?? null))
   .filter(Boolean);
 
-const EMOJI_COLS = 10;
-const EMOJI_SIZE = 28;
-const EMOJI_GAP  = 6;
-const ROW_HEIGHT = EMOJI_SIZE + EMOJI_GAP;
-const EMOJI_VISIBLE_ROWS = 10; // ~100 icon/lần
-const OVERSCAN_ROWS = 3;
-const EMOJI_PANEL_HEIGHT =
-  EMOJI_VISIBLE_ROWS * EMOJI_SIZE + (EMOJI_VISIBLE_ROWS - 1) * EMOJI_GAP;
+const EMOJI_COLS = 10, EMOJI_SIZE = 28, EMOJI_GAP = 6;
+const EMOJI_VISIBLE_ROWS = 10;
+const EMOJI_PANEL_HEIGHT = EMOJI_VISIBLE_ROWS * EMOJI_SIZE + (EMOJI_VISIBLE_ROWS - 1) * EMOJI_GAP;
 
-function VirtualEmojiGrid({ emojis, cols, size, gap, panelHeight, onPick }) {
-  const scrollRef = useRef(null);
-  const [scrollTop, setScrollTop] = useState(0);
-
-  const totalRows = Math.ceil(emojis.length / cols);
-  const totalHeight = Math.max(0, totalRows * (size + gap) - gap);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => setScrollTop(el.scrollTop);
-    el.addEventListener("scroll", onScroll);
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS);
-  const endRow = Math.min(totalRows - 1, Math.floor((scrollTop + panelHeight) / ROW_HEIGHT) + OVERSCAN_ROWS);
-
-  const startIndex = startRow * cols;
-  const endIndex = Math.min(emojis.length, (endRow + 1) * cols);
-  const slice = emojis.slice(startIndex, endIndex);
-
-  const translateY = startRow * ROW_HEIGHT;
-
-  return (
-    <div ref={scrollRef} style={{ height: panelHeight, overflowY:"auto", paddingRight:4, WebkitOverflowScrolling:"touch" }}>
-      <div style={{ height: totalHeight, position:"relative" }}>
-        <div style={{ position:"absolute", top: translateY, left:0, right:0 }}>
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols}, ${size}px)`, gap:gap }}>
-            {slice.map((ch, i) => (
-              <button
-                key={`${ch}-${startIndex + i}`}
-                onClick={() => onPick(ch)}
-                style={{ width:size, height:size, fontSize:20, lineHeight:`${size}px`, border:"none", background:"transparent", cursor:"pointer" }}
-              >
-                {ch}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* Emoji popup (portal) */
 function EmojiPortal({ open, pos, onPick, onClose }) {
   if (!open) return null;
   return createPortal(
     <div
       style={{
-        position: "fixed",
-        left: pos.left,
-        bottom: pos.bottom,
-        zIndex: 10050,
-        background: "#fff",
-        border: "1px solid #eee",
-        borderRadius: 8,
-        padding: 8,
-        boxShadow: "0 8px 28px rgba(0,0,0,.18)",
-        maxWidth: EMOJI_COLS * (EMOJI_SIZE + EMOJI_GAP) + 16,
+        position:"fixed", left:pos.left, bottom:pos.bottom, zIndex:10050,
+        background:"#fff", border:"1px solid #eee", borderRadius:8, padding:8,
+        boxShadow:"0 8px 28px rgba(0,0,0,.18)", maxWidth: EMOJI_COLS*(EMOJI_SIZE+EMOJI_GAP)+16,
       }}
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e)=>e.preventDefault()}
     >
-      {/* Khung cuộn ~100 icon hiển thị mỗi lần */}
-      <div
-        style={{
-          height: EMOJI_PANEL_HEIGHT,
-          overflowY: "auto",
-          paddingRight: 4,
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${EMOJI_COLS}, ${EMOJI_SIZE}px)`,
-            gap: EMOJI_GAP,
-          }}
-        >
-          {EMOJIS.map((ch, i) => (
-            <button
-              key={`${ch}-${i}`}
-              onClick={() => onPick(ch)}
-              style={{
-                width: EMOJI_SIZE,
-                height: EMOJI_SIZE,
-                fontSize: 20,
-                lineHeight: `${EMOJI_SIZE}px`,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-              }}
-            >
+      <div style={{
+        height:EMOJI_PANEL_HEIGHT, overflowY:"auto", paddingRight:4, WebkitOverflowScrolling:"touch"
+      }}>
+        <div style={{ display:"grid", gridTemplateColumns:`repeat(${EMOJI_COLS}, ${EMOJI_SIZE}px)`, gap:EMOJI_GAP }}>
+          {EMOJIS.map((ch,i)=>(
+            <button key={`${ch}-${i}`} onClick={()=>onPick(ch)}
+              style={{width:EMOJI_SIZE,height:EMOJI_SIZE,fontSize:20,lineHeight:`${EMOJI_SIZE}px`,
+              border:"none",background:"transparent",cursor:"pointer"}}>
               {ch}
             </button>
           ))}
         </div>
       </div>
-
-      <div style={{ textAlign: "right", marginTop: 6 }}>
-        <button onClick={onClose} style={{ fontSize: 12 }}>
-          Đóng
-        </button>
+      <div style={{ textAlign:"right", marginTop:6 }}>
+        <button onClick={onClose} style={{ fontSize:12 }}>Đóng</button>
       </div>
     </div>,
     document.body
   );
 }
 
-/* ===== Cloudinary unsigned upload (client) ===== */
+/* ===== Cloudinary unsigned upload ===== */
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_PRESET;
 
-async function uploadToCloudinary(file) {
+if (!CLOUD_NAME || !UPLOAD_PRESET) {
+  console.warn("Missing Cloudinary env: VITE_CLOUDINARY_CLOUD or VITE_CLOUDINARY_PRESET");
+}
+
+// endpoint: thử 'image/video' trước, rồi fallback 'auto'
+async function uploadToCloudinary(file, kind /* 'image' | 'video' */) {
+  if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error("Thiếu CLOUD/PRESET trong .env");
+
   const fd = new FormData();
   fd.append("file", file);
   fd.append("upload_preset", UPLOAD_PRESET);
 
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-    method: "POST",
-    body: fd,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || "Upload failed");
-  return { url: data.secure_url, publicId: data.public_id, width: data.width, height: data.height };
+  const tryTypes = kind === "video" ? ["video", "auto"] : ["image", "auto"];
+  let lastErr = "Upload failed";
+
+  for (const type of tryTypes) {
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (res.ok) {
+        return {
+          url: json.secure_url,
+          publicId: json.public_id,
+          width: json.width,
+          height: json.height,
+          duration: json.duration,
+          resourceType: json.resource_type,
+        };
+      }
+      lastErr = json?.error?.message || lastErr;
+    } catch (e) {
+      lastErr = e?.message || lastErr;
+    }
+  }
+  throw new Error(lastErr);
 }
+
+/* ===== Giới hạn dung lượng ===== */
+const LIMIT_IMAGE = 10 * 1024 * 1024;   // 10MB
+const LIMIT_VIDEO = 45 * 1024 * 1024;   // 45MB
+const fmtBytes = (b) => `${(b/1024/1024).toFixed(1)} MB`;
 
 export default function ChatWindow() {
   const { selectedRoom, members, setIsInviteMemberVisible } = useContext(AppContext);
@@ -199,15 +145,24 @@ export default function ChatWindow() {
   const [pickerPos, setPickerPos] = useState({ left: 16, bottom: 120 });
   const emojiBtnRef = useRef(null);
 
-  // Popup gửi ảnh
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  // Popup media (ảnh/video)
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mediaType, setMediaType] = useState("image"); // 'image' | 'video'
+  const [fileList, setFileList] = useState([]);        // Antd Upload list (UploadFile[])
+  const [selectedFile, setSelectedFile] = useState(null); // File (origin)
+  const [previewUrl, setPreviewUrl] = useState("");    // preview URL
   const [uploading, setUploading] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
+  const [sizeError, setSizeError] = useState("");       // ⬅️ Hiện lỗi trong modal
 
   const [form] = Form.useForm();
   const inputRef = useRef(null);
   const messageListRef = useRef(null);
+
+  // đảm bảo toast không bị khuất
+  useEffect(() => {
+    antdMessage.config({ top: 72, duration: 3, maxCount: 1 });
+  }, []);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
@@ -221,14 +176,8 @@ export default function ChatWindow() {
     if (!toSend) return;
 
     addDocument("messages", {
-      text: toSend,
-      uid,
-      photoURL,
-      roomId: selectedRoom.id,
-      displayName,
-      isRecalled: false,
-      recalledAt: null,
-      clientTime: Date.now(),
+      text: toSend, uid, photoURL, roomId: selectedRoom.id, displayName,
+      isRecalled: false, recalledAt: null, clientTime: Date.now(),
     });
 
     form.resetFields(["message"]);
@@ -241,16 +190,15 @@ export default function ChatWindow() {
     const ch = typeof emoji === "string" ? emoji : (emoji?.native ?? "");
     const el = inputRef.current?.input || inputRef.current?.resizableTextArea?.textArea || null;
     const current = inputValue || "";
-    let next = "";
+    let next = current;
 
     if (el) {
       const start = el.selectionStart ?? current.length;
       const end   = el.selectionEnd ?? current.length;
       next = current.slice(0, start) + ch + current.slice(end);
-      requestAnimationFrame(() => { try { el.focus(); const pos = start + ch.length; el.setSelectionRange?.(pos, pos);} catch {} });
-    } else {
-      next = current + ch;
-    }
+      requestAnimationFrame(() => { try { el.focus(); const pos = start + ch.length; el.setSelectionRange?.(pos, pos); } catch {} });
+    } else next = current + ch;
+
     setInputValue(next);
     form.setFieldsValue({ message: next });
     if (autoSend) handleOnSubmit(next);
@@ -281,50 +229,144 @@ export default function ChatWindow() {
     if (messageListRef?.current) messageListRef.current.scrollTop = messageListRef.current.scrollHeight + 50;
   }, [messages]);
 
-  // ===== Popup gửi ảnh =====
-  const openImageModal = () => setImageModalOpen(true);
-  const closeImageModal = () => { if (uploading) return; setImageModalOpen(false); setSelectedFile(null); setUploadPercent(0); };
-
-  const beforeUpload = (file) => {
-    if (!file.type.startsWith("image/")) { antdMessage.error("Chỉ hỗ trợ hình ảnh"); return Upload.LIST_IGNORE; }
-    const LIMIT = 5 * 1024 * 1024;
-    if (file.size > LIMIT) { antdMessage.error("Ảnh quá lớn (tối đa 5MB)"); return Upload.LIST_IGNORE; }
-    setSelectedFile(file);
-    return false; // chặn upload tự động, để tự xử lý
+  // ====== Media modal ======
+  const openMedia = (kind) => {
+    setMediaType(kind);
+    setMediaModalOpen(true);
+    // reset khi mở
+    setSelectedFile(null);
+    setFileList([]);
+    setPreviewUrl("");
+    setSizeError(""); // reset lỗi
+  };
+  const closeMediaModal = () => {
+    if (uploading) return;
+    setMediaModalOpen(false);
+    setSelectedFile(null);
+    setFileList([]);
+    setUploadPercent(0);
+    setPreviewUrl("");
+    setSizeError(""); // reset lỗi
   };
 
-  const handleUploadImage = async () => {
-    if (!selectedFile) { antdMessage.warning("Chưa chọn ảnh"); return; }
+  // Hiển thị lỗi quá dung lượng (toast + alert trong modal)
+  const showOverLimit = (kindLabel, size, limit) => {
+    const msg = `Dung lượng ${kindLabel} (${fmtBytes(size)}) vượt quá giới hạn cho phép (${fmtBytes(limit)}).`;
+    setSizeError(msg);
+    antdMessage.error(msg);
+  };
+
+  // Preview URL theo file gốc (originFileObj)
+  useEffect(() => {
+    const raw = selectedFile;
+    if (!raw) { setPreviewUrl(""); return; }
+    const url = URL.createObjectURL(raw);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
+
+  // kiểm tra ext (phòng khi type rỗng)
+  const isExtImage = (name='') => ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(name.split('.').pop()?.toLowerCase());
+  const isExtVideo = (name='') => ['mp4','mov','webm','mkv','avi','m4v'].includes(name.split('.').pop()?.toLowerCase());
+
+  // Antd Upload: chặn auto upload, set list + validate size/type
+  const beforeUpload = (file) => {
+    const type = file.type || "";
+    const name = file.name || "";
+    const isImg = type.startsWith("image/") || isExtImage(name);
+    const isVid = type.startsWith("video/") || isExtVideo(name);
+
+    if (mediaType === "image" && !isImg) { antdMessage.error("Chỉ chọn tệp ảnh"); return Upload.LIST_IGNORE; }
+    if (mediaType === "video" && !isVid) { antdMessage.error("Chỉ chọn tệp video"); return Upload.LIST_IGNORE; }
+
+    const limit = mediaType === "image" ? LIMIT_IMAGE : LIMIT_VIDEO;
+    if (file.size > limit) {
+      showOverLimit(mediaType === "image" ? "ảnh" : "video", file.size, limit);
+      return Upload.LIST_IGNORE;
+    }
+
+    setSizeError("");
+    setFileList([file]); // giữ UploadFile trong list
+    setSelectedFile(file.originFileObj || file); // file preview/upload
+    return false; // không auto upload
+  };
+
+  // Bắt file khi change (kể cả kéo-thả)
+  const handleSelectFile = (info) => {
+    const list = (info?.fileList || []).slice(-1); // chỉ giữ 1 file
+    setFileList(list);
+
+    const uf = info?.file; // UploadFile
+    const raw = uf?.originFileObj;
+    if (!raw) return;
+
+    // validate lại + cảnh báo dung lượng
+    const type = raw.type || "";
+    const name = raw.name || "";
+    const isImg = type.startsWith("image/") || isExtImage(name);
+    const isVid = type.startsWith("video/") || isExtVideo(name);
+    if (mediaType === "image" && !isImg) return;
+    if (mediaType === "video" && !isVid) return;
+
+    const limit = mediaType === "image" ? LIMIT_IMAGE : LIMIT_VIDEO;
+    if (raw.size > limit) {
+      showOverLimit(mediaType === "image" ? "ảnh" : "video", raw.size, limit);
+      setFileList([]);
+      setSelectedFile(null);
+      return;
+    }
+
+    setSizeError("");
+    setSelectedFile(raw);
+  };
+
+  const handleUploadMedia = async () => {
+    if (!selectedFile) { antdMessage.warning("Chưa chọn tệp"); return; }
     try {
       setUploading(true);
-      setUploadPercent(30); // progress giả định (Cloudinary fetch không báo tiến độ)
-      const { url, publicId } = await uploadToCloudinary(selectedFile);
+      setUploadPercent(30);
+
+      const { url, publicId, resourceType } = await uploadToCloudinary(selectedFile, mediaType);
       setUploadPercent(90);
 
-      await addDocument("messages", {
+      const payload = {
         text: "",
-        imageUrl: url,
-        imagePublicId: publicId,   // lưu để sau này muốn xoá thật thì có id
-        imageName: selectedFile.name,
-        uid,
-        photoURL,
-        roomId: selectedRoom.id,
-        displayName,
-        isRecalled: false,
-        recalledAt: null,
-        clientTime: Date.now(),
-      });
+        uid, photoURL, roomId: selectedRoom.id, displayName,
+        isRecalled: false, recalledAt: null, clientTime: Date.now(),
+      };
+
+      const isImage = (mediaType === "image") || resourceType === "image";
+      if (isImage) {
+        payload.imageUrl = url;
+        payload.imagePublicId = publicId;
+        payload.imageName = selectedFile.name;
+      } else {
+        payload.videoUrl = url;
+        payload.videoPublicId = publicId;
+        payload.videoName = selectedFile.name;
+      }
+
+      await addDocument("messages", payload);
 
       setUploadPercent(100);
-      antdMessage.success("Đã gửi ảnh");
-      closeImageModal();
+      antdMessage.success(`Đã gửi ${isImage ? "ảnh" : "video"}`);
+      closeMediaModal();
     } catch (err) {
       console.error(err);
-      antdMessage.error(err.message || "Gửi ảnh thất bại");
+      antdMessage.error(`Lỗi upload: ${err.message || "không xác định"}`);
     } finally {
       setUploading(false);
       setUploadPercent(0);
     }
+  };
+
+  // Menu đính kèm (ảnh / video)
+  const attachMenu = {
+    items: [
+      { key:"image", label:(<Space><PictureOutlined/> Ảnh</Space>) },
+      { key:"video", label:(<Space><VideoCameraOutlined/> Video</Space>) },
+    ],
+    onClick: ({ key }) => openMedia(key),
   };
 
   return (
@@ -367,6 +409,9 @@ export default function ChatWindow() {
                     imageUrl={mes.imageUrl}
                     imageName={mes.imageName}
                     imagePublicId={mes.imagePublicId}
+                    videoUrl={mes.videoUrl}
+                    videoName={mes.videoName}
+                    videoPublicId={mes.videoPublicId}
                   />
                 ))}
               </MessageListStyled>
@@ -374,8 +419,9 @@ export default function ChatWindow() {
               <FormStyled form={form}>
                 <Button ref={emojiBtnRef} type="text" onClick={openEmojiPicker} aria-label="Insert emoji">😊</Button>
 
-                {/* Nút mở popup gửi ảnh */}
-                <Button type="text" icon={<PictureOutlined />} onClick={openImageModal} aria-label="Send image" />
+                <Dropdown menu={attachMenu} placement="topLeft" trigger={["click"]}>
+                  <Button type="text" icon={<PaperClipOutlined />} aria-label="Attachment" />
+                </Dropdown>
 
                 <FormItem name="message" style={{ flex:1, marginBottom:0 }}>
                   <Input
@@ -392,41 +438,79 @@ export default function ChatWindow() {
                 <Button type="primary" onClick={() => handleOnSubmit()}>Gửi</Button>
               </FormStyled>
 
-              {/* Popup gửi ảnh */}
+              {/* Popup gửi media */}
               <Modal
-                title="Gửi hình ảnh"
-                open={imageModalOpen}
-                onCancel={closeImageModal}
-                okText={uploading ? "Đang gửi..." : "Gửi ảnh"}
-                okButtonProps={{ disabled: !selectedFile || uploading, loading: uploading }}
-                onOk={handleUploadImage}
-                destroyOnHidden
+                title={`Gửi ${mediaType === "image" ? "ảnh" : "video"}`}
+                open={mediaModalOpen}
+                onCancel={closeMediaModal}
+                destroyOnClose
+                maskClosable={!uploading}
+                footer={[
+                  <Button key="cancel" onClick={closeMediaModal} disabled={uploading}>Hủy</Button>,
+                  <Button
+                    key="ok" type="primary"
+                    onClick={handleUploadMedia}
+                    disabled={!selectedFile || uploading || !!sizeError}
+                    loading={uploading}
+                  >
+                    Gửi
+                  </Button>,
+                ]}
               >
                 <Upload.Dragger
-                  accept="image/*"
+                  accept={mediaType === "image" ? "image/*" : "video/*"}
                   multiple={false}
                   maxCount={1}
                   beforeUpload={beforeUpload}
+                  onChange={handleSelectFile}
+                  fileList={fileList}
                   showUploadList={{ showRemoveIcon: !uploading }}
-                  onRemove={() => setSelectedFile(null)}
+                  onRemove={() => { setSelectedFile(null); setFileList([]); setPreviewUrl(""); setSizeError(""); }}
+                  onDrop={(e) => {
+                    const f = e.dataTransfer?.files?.[0];
+                    if (!f) return;
+                    const limit = mediaType === "image" ? LIMIT_IMAGE : LIMIT_VIDEO;
+                    if (f.size > limit) {
+                      showOverLimit(mediaType === "image" ? "ảnh" : "video", f.size, limit);
+                    }
+                  }}
                 >
-                  <p className="ant-upload-drag-icon"><PictureOutlined /></p>
-                  <p className="ant-upload-text">Kéo & thả ảnh vào đây, hoặc bấm để chọn</p>
-                  <p className="ant-upload-hint">Hỗ trợ định dạng hình ảnh, tối đa 5MB.</p>
+                  <p className="ant-upload-drag-icon">
+                    {mediaType === "image" ? <PictureOutlined/> : <VideoCameraOutlined/>}
+                  </p>
+                  <p className="ant-upload-text">
+                    Kéo & thả {mediaType === "image" ? "ảnh" : "video"} vào đây, hoặc bấm để chọn
+                  </p>
+                  <p className="ant-upload-hint">
+                    {mediaType === "image"
+                      ? `Tối đa ${fmtBytes(LIMIT_IMAGE)}.`
+                      : `Tối đa ${fmtBytes(LIMIT_VIDEO)}.`}
+                  </p>
                 </Upload.Dragger>
 
-                {uploading && <Progress percent={uploadPercent} size="small" style={{ marginTop: 12 }} />}
-
-                {selectedFile && !uploading && (
+                {/* ALERT lỗi quá dung lượng trong modal */}
+                {sizeError && (
                   <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize:12, color:"#666", marginBottom:6 }}>{selectedFile.name}</div>
-                    <img
-                      src={URL.createObjectURL(selectedFile)}
-                      alt="preview"
-                      style={{ maxWidth:"100%", borderRadius:8, display:"block" }}
-                      onLoad={(e) => URL.revokeObjectURL(e.target.src)}
-                    />
+                    <Alert type="error" showIcon message={sizeError} />
                   </div>
+                )}
+
+                {/* PREVIEW */}
+                {previewUrl && !uploading && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize:12, color:"#666", marginBottom:6 }}>
+                      {selectedFile?.name}
+                    </div>
+                    {mediaType === "image" ? (
+                      <img src={previewUrl} alt="preview" style={{ maxWidth:"100%", borderRadius:8, display:"block" }} />
+                    ) : (
+                      <video controls src={previewUrl} style={{ width:"100%", borderRadius:8, display:"block" }} />
+                    )}
+                  </div>
+                )}
+
+                {uploading && (
+                  <Progress percent={uploadPercent} size="small" style={{ marginTop: 12 }} />
                 )}
               </Modal>
 
