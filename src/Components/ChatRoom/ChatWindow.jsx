@@ -112,22 +112,59 @@ function EmojiPortal({ open, pos, onPick, onClose }) {
   return createPortal(
     <div
       style={{
-        position:"fixed", left:pos.left, bottom:pos.bottom, zIndex:10050,
-        background:"#fff", border:"1px solid #eee", borderRadius:8, padding:8,
-        boxShadow:"0 8px 28px rgba(0,0,0,.18)", maxWidth: EMOJI_COLS * (EMOJI_SIZE + EMOJI_GAP) + 16,
+        position: "fixed",
+        left: pos.left,
+        bottom: pos.bottom,
+        zIndex: 10050,
+        background: "#fff",
+        border: "1px solid #eee",
+        borderRadius: 8,
+        padding: 8,
+        boxShadow: "0 8px 28px rgba(0,0,0,.18)",
+        maxWidth: EMOJI_COLS * (EMOJI_SIZE + EMOJI_GAP) + 16,
       }}
-      onMouseDown={(e)=>e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
     >
-      <VirtualEmojiGrid
-        emojis={EMOJIS}
-        cols={EMOJI_COLS}
-        size={EMOJI_SIZE}
-        gap={EMOJI_GAP}
-        panelHeight={EMOJI_PANEL_HEIGHT}
-        onPick={onPick}
-      />
-      <div style={{textAlign:"right", marginTop:6}}>
-        <button onClick={onClose} style={{fontSize:12}}>Đóng</button>
+      {/* Khung cuộn ~100 icon hiển thị mỗi lần */}
+      <div
+        style={{
+          height: EMOJI_PANEL_HEIGHT,
+          overflowY: "auto",
+          paddingRight: 4,
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${EMOJI_COLS}, ${EMOJI_SIZE}px)`,
+            gap: EMOJI_GAP,
+          }}
+        >
+          {EMOJIS.map((ch, i) => (
+            <button
+              key={`${ch}-${i}`}
+              onClick={() => onPick(ch)}
+              style={{
+                width: EMOJI_SIZE,
+                height: EMOJI_SIZE,
+                fontSize: 20,
+                lineHeight: `${EMOJI_SIZE}px`,
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              {ch}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ textAlign: "right", marginTop: 6 }}>
+        <button onClick={onClose} style={{ fontSize: 12 }}>
+          Đóng
+        </button>
       </div>
     </div>,
     document.body
