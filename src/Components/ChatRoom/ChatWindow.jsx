@@ -3,6 +3,7 @@ import {
   PictureOutlined,
   VideoCameraOutlined,
   PaperClipOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
 import {
   Alert, Avatar, Input, Tooltip, Button, Progress, Modal, Upload,
@@ -13,6 +14,7 @@ import styled from "styled-components";
 import FormItem from "antd/es/form/FormItem";
 import Form from "antd/es/form/Form";
 import Message from "./Message";
+import CallModal from "./CallModal";
 import { AppContext } from "../../Context/AppProvider";
 import { AuthContext } from "../../Context/AuthProvider";
 import { addDocument } from "../../firebase/services";
@@ -154,6 +156,8 @@ export default function ChatWindow() {
   const [uploading, setUploading] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
   const [sizeError, setSizeError] = useState("");       // ⬅️ Hiện lỗi trong modal
+  const [callOpen, setCallOpen] = useState(false);
+
 
   const [form] = Form.useForm();
   const inputRef = useRef(null);
@@ -216,7 +220,7 @@ export default function ChatWindow() {
   };
 
   useEffect(() => {
-    const close = (e) => { if (emojiBtnRef.current && emojiBtnRef.current.contains(e.target)) return; setOpenEmoji(false); };
+    const close = (e) => { if (emojiBtnRef.current && emojiBtnRef.current.contains(e.target)) return; };
     if (openEmoji) window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [openEmoji]);
@@ -380,6 +384,7 @@ export default function ChatWindow() {
                 <span className="header__description">{selectedRoom.description}</span>
               </div>
               <ButtonGroupStyled>
+                <Button icon={<PhoneOutlined />} type="text" onClick={() => setCallOpen(true)}>Call</Button>
                 <Button icon={<UserAddOutlined />} type="text" onClick={() => setIsInviteMemberVisible(true)}>Mời</Button>
                 <Avatar.Group size="small" max={{ count: 2 }}>
                   {members.map(member => (
@@ -517,9 +522,17 @@ export default function ChatWindow() {
               <EmojiPortal
                 open={openEmoji}
                 pos={pickerPos}
-                onPick={(e) => { insertEmoji(e); setOpenEmoji(false); }}
+                onPick={(e) => { insertEmoji(e); }}
                 onClose={() => setOpenEmoji(false)}
               />
+
+              <CallModal
+                open={callOpen}
+                onClose={() => setCallOpen(false)}
+                me={{ uid, displayName }}
+                roomId={selectedRoom.id}
+              />
+
             </ContentStyled>
           </div>
         </>
