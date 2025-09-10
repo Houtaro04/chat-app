@@ -196,7 +196,7 @@ export default function CallModal({ open, onClose, me, roomId }) {
 
   return (
     <Modal
-      title="Cuộc gọi P2P (WebRTC + STUN miễn phí)"
+      title="Cuộc gọi của bạn"
       open={open}
       onCancel={hangup}
       footer={null}
