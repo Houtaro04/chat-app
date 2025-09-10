@@ -448,7 +448,7 @@ export default function ChatWindow() {
                 title={`Gửi ${mediaType === "image" ? "ảnh" : "video"}`}
                 open={mediaModalOpen}
                 onCancel={closeMediaModal}
-                destroyOnClose
+                destroyOnHidden
                 maskClosable={!uploading}
                 footer={[
                   <Button key="cancel" onClick={closeMediaModal} disabled={uploading}>Hủy</Button>,

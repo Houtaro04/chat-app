@@ -1,7 +1,7 @@
 import { Button, Row, Col, Typography } from 'antd';
 import React from 'react';
 import { GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth';
-import { auth } from '../../firebase/config'; // đường dẫn đúng tới config.js
+import { auth, firebase } from '../../firebase/config'; // đường dẫn đúng tới config.js
 import '../../Components/Login/Login.css'; // Đảm bảo bạn đã tạo file CSS này để định dạng nút đăng nhập
 import { GoogleOutlined, FacebookOutlined } from '@ant-design/icons';
 import { addDocument, generateKeywords } from '../../firebase/services';
@@ -9,8 +9,8 @@ import logo from '../../assets/logo.png'
 
 const { Title } = Typography;
 
-const fbProvider = new FacebookAuthProvider();
-const googleProvider = new GoogleAuthProvider();
+const fbProvider = new firebase.auth.FacebookAuthProvider();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 export default function Login() {
   const handleLogin = async (provider) => {
