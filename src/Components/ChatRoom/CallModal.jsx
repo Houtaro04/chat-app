@@ -120,6 +120,10 @@ function OneToOneWindow({ mode, me, roomId, defaultVideo = true, joinIdInitial =
   const [callId, setCallId] = useState("");
   const [joinId, setJoinId] = useState(joinIdInitial);
 
+  // NEW: trạng thái mic/cam
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+
   const pcRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -146,11 +150,29 @@ function OneToOneWindow({ mode, me, roomId, defaultVideo = true, joinIdInitial =
   };
   useEffect(() => () => { cleanup(); }, []);
 
+  // Lấy media và áp dụng trạng thái mic/cam hiện tại
   const getMedia = async () => {
     const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+    // áp dụng enable/disable theo state
+    s.getAudioTracks().forEach(t => (t.enabled = micOn));
+    s.getVideoTracks().forEach(t => (t.enabled = camOn));
+
     localStreamRef.current = s;
     if (localVideoRef.current) localVideoRef.current.srcObject = s;
     return s;
+  };
+
+  // NEW: toggle mic/cam
+  const toggleMic = () => {
+    const next = !micOn;
+    setMicOn(next);
+    localStreamRef.current?.getAudioTracks()?.forEach(t => (t.enabled = next));
+  };
+
+  const toggleCam = () => {
+    const next = !camOn;
+    setCamOn(next);
+    localStreamRef.current?.getVideoTracks()?.forEach(t => (t.enabled = next));
   };
 
   const createPeer = () => {
@@ -278,6 +300,12 @@ function OneToOneWindow({ mode, me, roomId, defaultVideo = true, joinIdInitial =
         <Switch checkedChildren="Video" unCheckedChildren="Audio"
                 checked={isVideo} onChange={setIsVideo} />
 
+        {/* NEW: nút mic/cam */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={toggleMic}>{micOn ? "Mute mic" : "Unmute"}</Button>
+          <Button onClick={toggleCam}>{camOn ? "Tắt cam" : "Mở cam"}</Button>
+        </div>
+
         {mode === "create" ? (
           <Button type="primary" loading={creating} onClick={createCall}>Tạo cuộc gọi</Button>
         ) : (
@@ -314,6 +342,7 @@ function OneToOneWindow({ mode, me, roomId, defaultVideo = true, joinIdInitial =
     </div>
   );
 }
+
 
 // ========================= Group Call Window =========================
 function GroupWindow({ me, roomId, defaultVideo = true, onExit }) {
