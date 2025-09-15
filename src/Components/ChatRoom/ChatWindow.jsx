@@ -14,7 +14,7 @@ import styled from "styled-components";
 import FormItem from "antd/es/form/FormItem";
 import Form from "antd/es/form/Form";
 import Message from "./Message";
-import CallModal from "./CallModal";
+import CallModal from "../Modals/CallModal";
 import { AppContext } from "../../Context/AppProvider";
 import { AuthContext } from "../../Context/AuthProvider";
 import { addDocument } from "../../firebase/services";
@@ -23,6 +23,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../firebase/config";
 import { createPortal } from "react-dom";
 import emojiData from "@emoji-mart/data";
+import { Navigate } from "react-router-dom";
 
 const WrapperStyled = styled.div`height:100vh;`;
 const HeaderStyled = styled.div`
@@ -139,8 +140,44 @@ const fmtBytes = (b) => `${(b/1024/1024).toFixed(1)} MB`;
 
 export default function ChatWindow() {
   const { selectedRoom, members, setIsInviteMemberVisible } = useContext(AppContext);
-  const [user] = useAuthState(auth);
-  const { user: { uid, photoURL, displayName } } = useContext(AuthContext);
+
+  // Firebase user (nếu đăng nhập bằng Google/Facebook)
+  const [fbUser] = useAuthState(auth);
+
+  // User từ AuthContext (nếu provider của bạn có set)
+  const { user: ctxUser } = useContext(AuthContext) || {};
+
+  // User từ JWT (lưu trong localStorage sau khi login)
+  const jwtUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("jwt_auth") || "null")?.user || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Hợp nhất user → ưu tiên: Context → Firebase → JWT
+  const sessionUser = useMemo(() => {
+    const u =
+      ctxUser ||
+      (fbUser && { uid: fbUser.uid, displayName: fbUser.displayName, photoURL: fbUser.photoURL }) ||
+      jwtUser;
+
+    if (!u) return null;
+
+    return {
+      uid: u.uid ?? u.id ?? u._id ?? u.username ?? null,
+      displayName: u.displayName ?? u.username ?? "",
+      photoURL: u.photoURL ?? "",
+    };
+  }, [ctxUser, fbUser, jwtUser]);
+
+  const sessionUid = sessionUser?.uid;
+  const sessionName = sessionUser?.displayName || "";
+  const sessionPhoto = sessionUser?.photoURL || "";
+
+  // Nếu chưa đăng nhập, đá về /login
+  if (!sessionUid) return <Navigate to="/login" replace />;
 
   const [inputValue, setInputValue] = useState("");
   const [openEmoji, setOpenEmoji] = useState(false);
@@ -157,7 +194,6 @@ export default function ChatWindow() {
   const [uploadPercent, setUploadPercent] = useState(0);
   const [sizeError, setSizeError] = useState("");       // ⬅️ Hiện lỗi trong modal
   const [callOpen, setCallOpen] = useState(false);
-
 
   const [form] = Form.useForm();
   const inputRef = useRef(null);
@@ -180,8 +216,14 @@ export default function ChatWindow() {
     if (!toSend) return;
 
     addDocument("messages", {
-      text: toSend, uid, photoURL, roomId: selectedRoom.id, displayName,
-      isRecalled: false, recalledAt: null, clientTime: Date.now(),
+      text: toSend,
+      uid: sessionUid,
+      photoURL: sessionPhoto,
+      roomId: selectedRoom.id,
+      displayName: sessionName,
+      isRecalled: false,
+      recalledAt: null,
+      clientTime: Date.now(),
     });
 
     form.resetFields(["message"]);
@@ -226,7 +268,10 @@ export default function ChatWindow() {
   }, [openEmoji]);
 
   // Firestore
-  const condition = useMemo(() => ({ fieldName: "roomId", operator: "==", compareValue: selectedRoom.id }), [selectedRoom.id]);
+  const condition = useMemo(
+    () => ({ fieldName: "roomId", operator: "==", compareValue: selectedRoom.id }),
+    [selectedRoom.id]
+  );
   const messages = useFirestore("messages", condition);
 
   useEffect(() => {
@@ -335,8 +380,13 @@ export default function ChatWindow() {
 
       const payload = {
         text: "",
-        uid, photoURL, roomId: selectedRoom.id, displayName,
-        isRecalled: false, recalledAt: null, clientTime: Date.now(),
+        uid: sessionUid,
+        photoURL: sessionPhoto,
+        roomId: selectedRoom.id,
+        displayName: sessionName,
+        isRecalled: false,
+        recalledAt: null,
+        clientTime: Date.now(),
       };
 
       const isImage = (mediaType === "image") || resourceType === "image";
@@ -409,7 +459,7 @@ export default function ChatWindow() {
                     displayName={mes.displayName}
                     createdAt={mes.createdAt}
                     clientTime={mes.clientTime}
-                    isOwnMessage={mes.uid === user?.uid}
+                    isOwnMessage={mes.uid === sessionUid}
                     isRecalled={!!mes.isRecalled}
                     imageUrl={mes.imageUrl}
                     imageName={mes.imageName}
@@ -529,7 +579,7 @@ export default function ChatWindow() {
               <CallModal
                 open={callOpen}
                 onClose={() => setCallOpen(false)}
-                me={{ uid, displayName }}
+                me={{ uid: sessionUid, displayName: sessionName }}
                 roomId={selectedRoom.id}
               />
 

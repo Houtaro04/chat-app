@@ -141,7 +141,7 @@ export default function Message({
       )}
 
       <div className="content-box">
-        <Avatar className="avatar" size={AVATAR} src={photoURL} icon={!photoURL && <UserOutlined />}>
+        <Avatar className="avatar" size={AVATAR} src={photoURL || undefined} icon={!photoURL && <UserOutlined />}>
           {!photoURL && initial}
         </Avatar>
 

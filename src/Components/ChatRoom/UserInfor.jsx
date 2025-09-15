@@ -1,54 +1,100 @@
-// import { Avatar, Button, Typography } from "antd";
-import React, { useContext } from "react";
-import { auth } from "../../firebase/config"; // Adjust the import path as necessary
-import { AuthContext } from "../../Context/AuthProvider";
-import { Dropdown, Menu, Avatar, Space, Typography } from "antd";
-import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
+// src/Components/ChatRoom/UserInfor.jsx
+import React, { useContext, useMemo } from "react";
 import styled from "styled-components";
+import { Dropdown, Avatar, Space, Typography } from "antd";
+import { LogoutOutlined } from "@ant-design/icons";
+import { AuthContext } from "../../Context/AuthProvider";
+import { auth } from "../../firebase/config";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 const WrapperStyle = styled.div`
-    display: flex;
-    justify-content: flex-start;
-    margin-top: auto;
-    padding: 12px 16px;
-    border-top: 1px solid rgba(82, 38, 83);
+  display: flex;
+  justify-content: flex-start;
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(82, 38, 83, 0.4);
 
-    .username{
-        color: white;
-        margin-left: 5px;
-    }
+  .username {
+    color: white;
+    margin-left: 5px;
+  }
 `;
+
 export default function UserInfor() {
-    const handleLogout = () => {
-        // Xử lý đăng xuất ở đây
-        console.log("Đăng xuất");
-        auth.signOut();
+  // Firebase user (Google/Facebook)
+  const [fbUser] = useAuthState(auth);
+  // User từ Context (nếu bạn có set)
+  const { user: ctxUser } = useContext(AuthContext) || {};
+
+  // User từ JWT trong localStorage
+  const jwtUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("jwt_auth") || "null")?.user || null;
+    } catch {
+      return null;
     }
-    
-    const { user: {
-      displayName, 
-      photoURL
-    } } = useContext(AuthContext);
+  }, []);
 
-    const initial = displayName?.charAt(0)?.toUpperCase() || "";
+  // Hợp nhất user: ưu tiên Context → Firebase → JWT
+  const sessionUser = useMemo(() => {
+    const u =
+      ctxUser ||
+      (fbUser && {
+        uid: fbUser.uid,
+        displayName: fbUser.displayName,
+        photoURL: fbUser.photoURL,
+        email: fbUser.email,
+      }) ||
+      jwtUser;
 
-    const items = [
-      {
-        key: 'logout',
-        icon: <LogoutOutlined />,
-        label: "Đăng xuất"
-      }
-    ]
-    return (
+    if (!u) return { uid: null, displayName: "User", photoURL: "" };
+
+    return {
+      uid: u.uid ?? u.id ?? u._id ?? u.username ?? null,
+      displayName: u.displayName ?? u.username ?? "User",
+      photoURL: u.photoURL ?? "",
+    };
+  }, [ctxUser, fbUser, jwtUser]);
+
+  const initial = (sessionUser.displayName?.charAt(0) || "U").toUpperCase();
+
+  const handleLogout = async () => {
+    try {
+      // Xóa session JWT nếu có
+      localStorage.removeItem("jwt_auth");
+      // Đăng xuất Firebase nếu đang signed-in
+      await auth.signOut().catch(() => {});
+    } finally {
+      // Chuyển về /login
+      window.location.href = "/login";
+    }
+  };
+
+  const items = [
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Đăng xuất",
+    },
+  ];
+
+  return (
     <WrapperStyle>
       <div>
-        <Dropdown menu={{items, onClick: ({key}) => key === "logout" && handleLogout()}} trigger={["click"]} placement="bottomLeft">
-          <Space style={{ cursor: "pointer"}}>
-            <Avatar src={photoURL}>{!photoURL && initial}</Avatar>
-            <Typography.Text className="username">{displayName}</Typography.Text>
+        <Dropdown
+          menu={{
+            items,
+            onClick: ({ key }) => key === "logout" && handleLogout(),
+          }}
+          trigger={["click"]}
+          placement="bottomLeft"
+        >
+          <Space style={{ cursor: "pointer" }}>
+            <Avatar src={sessionUser.photoURL || undefined} style={{ backgroundColor: "#1677ff"}}>{!sessionUser.photoURL && initial}</Avatar>
+            <Typography.Text className="username">{sessionUser.displayName}</Typography.Text>
           </Space>
         </Dropdown>
       </div>
     </WrapperStyle>
   );
-} 
+}
