@@ -267,6 +267,7 @@ export default function Login() {
               className="social-login-button"
               onClick={() => setJwtOpen(true)}
               icon={<LoginOutlined />}
+              style={{gap: 12, width: "100%"}}
             >
               Login with Username
             </Button>
@@ -274,7 +275,6 @@ export default function Login() {
 
           {/* Register button */}
           <Button
-            type="dashed"
             className="social-login-button"
             onClick={() => setRegOpen(true)}
             icon={<PlusOutlined />}
