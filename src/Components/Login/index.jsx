@@ -251,7 +251,7 @@ export default function Login() {
           </Button>
 
           <Divider plain style={{ margin: "12px 0" }}>
-            hoặc
+            Hoặc
           </Divider>
 
           {/* JWT login button */}
