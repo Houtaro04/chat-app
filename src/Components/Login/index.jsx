@@ -1,34 +1,21 @@
 // src/Components/Login/Login.jsx
 import React, { useState, useEffect } from "react";
 import {
-  Row,
-  Col,
-  Typography,
-  Button,
-  Modal,
-  Form,
-  Input,
-  message,
-  Divider,
+  Row, Col, Typography, Button, Modal, Form, Input, message, Divider,
 } from "antd";
 import {
-  GoogleOutlined,
-  FacebookOutlined,
-  UserOutlined,
-  LockOutlined,
-  MailOutlined,
-  PlusOutlined,
-  LoginOutlined,
+  GoogleOutlined, FacebookOutlined, UserOutlined, LockOutlined,
+  MailOutlined, PlusOutlined, LoginOutlined,
 } from "@ant-design/icons";
 import { auth, firebase } from "../../firebase/config";
 import { addDocument, generateKeywords } from "../../firebase/services";
 import axios from "axios";
-// import { register } from "../../API/auth";  // không dùng
 import { loginWithPassword } from "../../API/auth";
 import { useNavigate } from "react-router-dom";
 import "../../Components/Login/Login.css";
 import logo from "../../assets/logo.png";
-import { onAuthStateChanged } from "firebase/auth";
+// ❌ bỏ import onAuthStateChanged của modular: không dùng với compat
+// import { onAuthStateChanged } from "firebase/auth";
 
 const { Title, Text } = Typography;
 
@@ -40,7 +27,7 @@ const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:8000";
 export default function Login() {
   const navigate = useNavigate();
 
-  // Modal JWT Login
+  // Modal JWT
   const [jwtOpen, setJwtOpen] = useState(false);
   const [jwtLoading, setJwtLoading] = useState(false);
   const [loginForm] = Form.useForm();
@@ -53,9 +40,14 @@ export default function Login() {
   // ------------------ SOCIAL (Firebase) ------------------
   const handleLoginSocial = async (provider) => {
     try {
+      // Dùng redirect khi DEV/Emulator để tránh "No matching frame"
+      if (import.meta.env?.DEV) {
+        await auth.signInWithRedirect(provider);
+        return;
+      }
+
       const { additionalUserInfo, user } = await auth.signInWithPopup(provider);
 
-      // nếu là user mới → sync Firestore
       if (additionalUserInfo?.isNewUser) {
         try {
           await addDocument("users", {
@@ -73,22 +65,64 @@ export default function Login() {
 
       message.success("Đăng nhập thành công!");
       navigate("/", { replace: true });
-      // fallback cứng trong trường hợp guard ở trang chủ đẩy ngược vì render sớm
       setTimeout(() => (window.location.href = "/"), 0);
     } catch (err) {
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        message.warning("Bạn đã đóng cửa sổ đăng nhập.");
+        return;
+      }
       console.error(err);
       message.error(err?.message || "Đăng nhập thất bại");
     }
   };
+
+  // Sau khi redirect quay lại, lấy kết quả & điều hướng (compat API)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    auth
+      .getRedirectResult()
+      .then(async (res) => {
+        if (!res || !res.user) return;
+        const { user, additionalUserInfo } = res;
+
+        if (additionalUserInfo?.isNewUser) {
+          try {
+            await addDocument("users", {
+              displayName: user.displayName || "",
+              email: user.email || "",
+              photoURL: user.photoURL || "",
+              uid: user.uid,
+              providerId: additionalUserInfo.providerId,
+              keywords: generateKeywords((user.displayName || "").toLowerCase()),
+            });
+          } catch (e) {
+            console.warn("sync new user (redirect) error:", e?.message);
+          }
+        }
+
+        message.success("Đăng nhập thành công!");
+        navigate("/", { replace: true });
+        setTimeout(() => (window.location.href = "/"), 0);
+      })
+      .catch((e) => {
+        if (e?.code === "auth/no-auth-event") return;
+        console.warn("getRedirectResult error:", e);
+      });
+  }, [navigate]);
+
+  // Dùng compat onAuthStateChanged để điều hướng khi đã có user
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        // Nếu có user thì đồng bộ lên Firestore
-        syncUserToFirestore(user);
+        await syncUserToFirestore(user);
+        // đảm bảo rời khỏi /login nếu có phiên hợp lệ
+        navigate("/", { replace: true });
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
   // ------------------ helpers ------------------
   const saveAuth = (user, token) => {
@@ -105,7 +139,8 @@ export default function Login() {
         displayName: user.username || user.displayName || "",
         email: user.email || "",
         photoURL: user.photoURL || "",
-        uid: user._id || user.id || user.username,
+        // ưu tiên Firebase UID nếu có
+        uid: user.uid || user._id || user.id || user.username,
         providerId: "jwt",
         keywords: generateKeywords(
           String(user.username || user.displayName || "").toLowerCase()
@@ -134,10 +169,6 @@ export default function Login() {
     const { username, password } = values;
     setJwtLoading(true);
     try {
-      // nếu bạn muốn dùng API tự viết:
-      // await loginWithJwt({ username, password });
-
-      // hoặc dùng wrapper đã import:
       const { user, token } = await loginWithPassword({ username, password });
       saveAuth(user, token);
 
@@ -146,7 +177,6 @@ export default function Login() {
       loginForm.resetFields();
 
       navigate("/", { replace: true });
-      // fallback cứng
       setTimeout(() => (window.location.href = "/"), 0);
     } catch (err) {
       console.error(err);
@@ -161,7 +191,6 @@ export default function Login() {
     const { username, email, password } = values || {};
     setRegLoading(true);
     try {
-      // 1) Đăng ký
       await axios.post(
         `${API_BASE}/v1/auth/register`,
         { username, email, password },
@@ -169,14 +198,12 @@ export default function Login() {
       );
       message.success("Tạo tài khoản thành công! Đang đăng nhập…");
 
-      // 2) Auto login
       await loginWithJwt({ username, password });
 
       setRegOpen(false);
       regForm.resetFields();
 
       navigate("/", { replace: true });
-      // fallback cứng
       setTimeout(() => (window.location.href = "/"), 0);
     } catch (err) {
       console.error(err);
@@ -191,7 +218,7 @@ export default function Login() {
     }
   };
 
-  // Nếu đã có phiên đăng nhập thì rời khỏi /login
+  // Nếu đã có phiên đăng nhập thì rời khỏi /login (check ban đầu)
   useEffect(() => {
     try {
       const jwt = JSON.parse(localStorage.getItem("jwt_auth") || "null");
@@ -206,10 +233,7 @@ export default function Login() {
 
   return (
     <div style={{ padding: "10%", justifyContent: "center" }}>
-      <Row
-        justify="center"
-        style={{ minHeight: 420, backgroundColor: "#a3ab6f" }}
-      >
+      <Row justify="center" style={{ minHeight: 420, backgroundColor: "#a3ab6f" }}>
         <Col
           span={8}
           style={{
@@ -224,12 +248,8 @@ export default function Login() {
             src={logo}
             alt="logo"
             style={{
-              width: 200,
-              height: 50,
-              borderRadius: 10,
-              display: "flex",
-              marginLeft: "auto",
-              marginRight: "auto",
+              width: 200, height: 50, borderRadius: 10,
+              display: "flex", marginLeft: "auto", marginRight: "auto",
               objectFit: "contain",
             }}
           />
@@ -250,24 +270,16 @@ export default function Login() {
             Login with Facebook
           </Button>
 
-          <Divider plain style={{ margin: "12px 0" }}>
-            Hoặc
-          </Divider>
+          <Divider plain style={{ margin: "12px 0" }}>Hoặc</Divider>
 
           {/* JWT login button */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
             <Button
               type="primary"
               className="social-login-button"
               onClick={() => setJwtOpen(true)}
               icon={<LoginOutlined />}
-              style={{gap: 12, width: "100%"}}
+              style={{ gap: 12, width: "100%" }}
             >
               Login with Username
             </Button>
@@ -307,11 +319,7 @@ export default function Login() {
               { min: 3, message: "Tối thiểu 3 ký tự" },
             ]}
           >
-            <Input
-              placeholder="nhap_username"
-              allowClear
-              prefix={<UserOutlined />}
-            />
+            <Input placeholder="nhap_username" allowClear prefix={<UserOutlined />} />
           </Form.Item>
 
           <Form.Item
@@ -325,7 +333,6 @@ export default function Login() {
             <Input.Password placeholder="••••••••" prefix={<LockOutlined />} />
           </Form.Item>
 
-          {/* Ẩn nút submit thực để Enter hoạt động */}
           <Form.Item style={{ display: "none" }}>
             <button type="submit" />
           </Form.Item>
@@ -357,10 +364,7 @@ export default function Login() {
             rules={[
               { required: true, message: "Nhập username" },
               { min: 3, message: "Tối thiểu 3 ký tự" },
-              {
-                pattern: /^[a-zA-Z0-9_.]+$/,
-                message: "Chỉ chữ, số, dấu . hoặc _",
-              },
+              { pattern: /^[a-zA-Z0-9_.]+$/, message: "Chỉ chữ, số, dấu . hoặc _" },
             ]}
           >
             <Input placeholder="username" allowClear prefix={<UserOutlined />} />
@@ -371,11 +375,7 @@ export default function Login() {
             label="Email (tuỳ chọn)"
             rules={[{ type: "email", message: "Email không hợp lệ" }]}
           >
-            <Input
-              placeholder="you@example.com"
-              allowClear
-              prefix={<MailOutlined />}
-            />
+            <Input placeholder="you@example.com" allowClear prefix={<MailOutlined />} />
           </Form.Item>
 
           <Form.Item
@@ -397,11 +397,8 @@ export default function Login() {
               { required: true, message: "Nhập lại password" },
               ({ getFieldValue }) => ({
                 validator(_, value) {
-                  if (!value || getFieldValue("password") === value)
-                    return Promise.resolve();
-                  return Promise.reject(
-                    new Error("Mật khẩu nhập lại không khớp")
-                  );
+                  if (!value || getFieldValue("password") === value) return Promise.resolve();
+                  return Promise.reject(new Error("Mật khẩu nhập lại không khớp"));
                 },
               }),
             ]}
