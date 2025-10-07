@@ -1,3 +1,4 @@
+// src/Components/ChatWindow/ChatWindow.jsx
 import {
   UserAddOutlined,
   PictureOutlined,
@@ -20,7 +21,7 @@ import { AuthContext } from "../../Context/AuthProvider";
 import { addDocument } from "../../firebase/services";
 import useFirestore from "../../Hooks/useFirestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "../../firebase/config";
+import { auth, firebase } from "../../firebase/config";
 import { createPortal } from "react-dom";
 import emojiData from "@emoji-mart/data";
 import { Navigate } from "react-router-dom";
@@ -139,32 +140,17 @@ const LIMIT_VIDEO = 45 * 1024 * 1024;   // 45MB
 const fmtBytes = (b) => `${(b/1024/1024).toFixed(1)} MB`;
 
 export default function ChatWindow() {
-  const { selectedRoom, members, setIsInviteMemberVisible } = useContext(AppContext);
-
-  // Firebase user (nếu đăng nhập bằng Google/Facebook)
+  const { selectedRoom, members, setIsInviteMemberVisible, setSelectedRoomId } = useContext(AppContext);
   const [fbUser] = useAuthState(auth);
-
-  // User từ AuthContext (nếu provider của bạn có set)
   const { user: ctxUser } = useContext(AuthContext) || {};
-
-  // User từ JWT (lưu trong localStorage sau khi login)
   const jwtUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("jwt_auth") || "null")?.user || null;
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(localStorage.getItem("jwt_auth") || "null")?.user || null; }
+    catch { return null; }
   }, []);
 
-  // Hợp nhất user → ưu tiên: Context → Firebase → JWT
   const sessionUser = useMemo(() => {
-    const u =
-      ctxUser ||
-      (fbUser && { uid: fbUser.uid, displayName: fbUser.displayName, photoURL: fbUser.photoURL }) ||
-      jwtUser;
-
+    const u = ctxUser || (fbUser && { uid: fbUser.uid, displayName: fbUser.displayName, photoURL: fbUser.photoURL }) || jwtUser;
     if (!u) return null;
-
     return {
       uid: u.uid ?? u.id ?? u._id ?? u.username ?? null,
       displayName: u.displayName ?? u.username ?? "",
@@ -179,27 +165,140 @@ export default function ChatWindow() {
   // Nếu chưa đăng nhập, đá về /login
   if (!sessionUid) return <Navigate to="/login" replace />;
 
+  // === Nhận diện chủ phòng ===
+  const ownerUid =
+    selectedRoom?.ownerId ||
+    selectedRoom?.createdBy ||
+    selectedRoom?.owner ||
+    selectedRoom?.creatorUid ||
+    selectedRoom?.adminUid ||
+    null;
+  const isOwner = !!ownerUid && ownerUid === sessionUid;
+
+  // ===== System message helpers =====
+  const postSystemMessage = async (text) => {
+    if (!selectedRoom?.id) return;
+    try {
+      await addDocument("messages", {
+        text,
+        roomId: selectedRoom.id,
+        uid: "system",
+        displayName: "Hệ thống",
+        photoURL: "",
+        isSystem: true,
+        clientTime: Date.now(),
+      });
+    } catch (e) {
+      console.warn("postSystemMessage error:", e?.message);
+    }
+  };
+
+  // client "leader" = uid nhỏ nhất trong nhóm hiện tại => chỉ leader mới ghi log để tránh trùng
+  const amLeader = useMemo(() => {
+    const ids = (members || [])
+      .map(m => m.uid || m.id)
+      .filter(Boolean)
+      .sort();
+    return !!sessionUid && ids.length > 0 && ids[0] === sessionUid;
+  }, [members, sessionUid]);
+
+  // --- helper: lấy displayName theo uid nếu cần (fallback khi không có trong bộ nhớ cục bộ)
+  const fetchDisplayNameByUid = async (uid) => {
+    try {
+      const snap = await firebase
+        .firestore()
+        .collection("users")
+        .where("uid", "==", uid)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        const u = snap.docs[0].data();
+        return u.displayName || u.username || uid;
+      }
+    } catch (e) {
+      console.warn("fetchDisplayNameByUid error:", e?.message);
+    }
+    return uid;
+  };
+
+  // ==== lưu snapshot members trước đó (để lấy displayName khi bị remove) ====
+  const prevMembersRef = useRef(null);
+
+  // reset snapshot khi đổi phòng
+  useEffect(() => {
+    prevMembersRef.current = null;
+  }, [selectedRoom?.id]);
+
+  // Phát hiện thêm / bớt thành viên => ghi system message (đảm bảo luôn hiện displayName)
+  useEffect(() => {
+    if (!selectedRoom?.id) return;
+
+    const currMembers = members || [];
+    const currIds = currMembers.map(m => m.uid || m.id).filter(Boolean);
+
+    // lần đầu: chỉ lưu snapshot
+    if (!prevMembersRef.current) {
+      prevMembersRef.current = currMembers;
+      return;
+    }
+
+    const prevMembers = prevMembersRef.current;
+    const prevIds = prevMembers.map(m => m.uid || m.id).filter(Boolean);
+
+    const prevSet = new Set(prevIds);
+    const currSet = new Set(currIds);
+
+    const added   = currIds.filter(id => !prevSet.has(id));
+    const removed = prevIds.filter(id => !currSet.has(id));
+
+    // tên: ưu tiên hiện tại -> snapshot cũ -> uid
+    const nameFromLocal = (uid) =>
+      currMembers.find(m => (m.uid || m.id) === uid)?.displayName ||
+      prevMembers.find(m => (m.uid || m.id) === uid)?.displayName ||
+      uid;
+
+    if (amLeader) {
+      (async () => {
+        for (const uid of added) {
+          let name = nameFromLocal(uid);
+          if (name === uid) name = await fetchDisplayNameByUid(uid);
+          await postSystemMessage(`${name} đã tham gia nhóm`);
+        }
+        for (const uid of removed) {
+          let name = nameFromLocal(uid); // thường có trong snapshot cũ
+          if (name === uid) name = await fetchDisplayNameByUid(uid); // fallback query users
+          await postSystemMessage(`${name} đã rời nhóm`);
+        }
+      })();
+    }
+
+    // cập nhật snapshot cho lần so sánh sau
+    prevMembersRef.current = currMembers;
+  }, [members, selectedRoom?.id, amLeader]);
+
+  // Modal xem danh sách thành viên
+  const [membersOpen, setMembersOpen] = useState(false);
+
   const [inputValue, setInputValue] = useState("");
   const [openEmoji, setOpenEmoji] = useState(false);
   const [pickerPos, setPickerPos] = useState({ left: 16, bottom: 120 });
   const emojiBtnRef = useRef(null);
 
-  // Popup media (ảnh/video)
+  // Popup media
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
-  const [mediaType, setMediaType] = useState("image"); // 'image' | 'video'
-  const [fileList, setFileList] = useState([]);        // Antd Upload list (UploadFile[])
-  const [selectedFile, setSelectedFile] = useState(null); // File (origin)
-  const [previewUrl, setPreviewUrl] = useState("");    // preview URL
+  const [mediaType, setMediaType] = useState("image");
+  const [fileList, setFileList] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
-  const [sizeError, setSizeError] = useState("");       // ⬅️ Hiện lỗi trong modal
+  const [sizeError, setSizeError] = useState("");
   const [callOpen, setCallOpen] = useState(false);
 
   const [form] = Form.useForm();
   const inputRef = useRef(null);
   const messageListRef = useRef(null);
 
-  // đảm bảo toast không bị khuất
   useEffect(() => {
     antdMessage.config({ top: 72, duration: 3, maxCount: 1 });
   }, []);
@@ -282,11 +381,10 @@ export default function ChatWindow() {
   const openMedia = (kind) => {
     setMediaType(kind);
     setMediaModalOpen(true);
-    // reset khi mở
     setSelectedFile(null);
     setFileList([]);
     setPreviewUrl("");
-    setSizeError(""); // reset lỗi
+    setSizeError("");
   };
   const closeMediaModal = () => {
     if (uploading) return;
@@ -295,17 +393,15 @@ export default function ChatWindow() {
     setFileList([]);
     setUploadPercent(0);
     setPreviewUrl("");
-    setSizeError(""); // reset lỗi
+    setSizeError("");
   };
 
-  // Hiển thị lỗi quá dung lượng (toast + alert trong modal)
   const showOverLimit = (kindLabel, size, limit) => {
     const msg = `Dung lượng ${kindLabel} (${fmtBytes(size)}) vượt quá giới hạn cho phép (${fmtBytes(limit)}).`;
     setSizeError(msg);
     antdMessage.error(msg);
   };
 
-  // Preview URL theo file gốc (originFileObj)
   useEffect(() => {
     const raw = selectedFile;
     if (!raw) { setPreviewUrl(""); return; }
@@ -314,11 +410,9 @@ export default function ChatWindow() {
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
 
-  // kiểm tra ext (phòng khi type rỗng)
   const isExtImage = (name='') => ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(name.split('.').pop()?.toLowerCase());
   const isExtVideo = (name='') => ['mp4','mov','webm','mkv','avi','m4v'].includes(name.split('.').pop()?.toLowerCase());
 
-  // Antd Upload: chặn auto upload, set list + validate size/type
   const beforeUpload = (file) => {
     const type = file.type || "";
     const name = file.name || "";
@@ -335,21 +429,19 @@ export default function ChatWindow() {
     }
 
     setSizeError("");
-    setFileList([file]); // giữ UploadFile trong list
-    setSelectedFile(file.originFileObj || file); // file preview/upload
-    return false; // không auto upload
+    setFileList([file]);
+    setSelectedFile(file.originFileObj || file);
+    return false;
   };
 
-  // Bắt file khi change (kể cả kéo-thả)
   const handleSelectFile = (info) => {
-    const list = (info?.fileList || []).slice(-1); // chỉ giữ 1 file
+    const list = (info?.fileList || []).slice(-1);
     setFileList(list);
 
-    const uf = info?.file; // UploadFile
+    const uf = info?.file;
     const raw = uf?.originFileObj;
     if (!raw) return;
 
-    // validate lại + cảnh báo dung lượng
     const type = raw.type || "";
     const name = raw.name || "";
     const isImg = type.startsWith("image/") || isExtImage(name);
@@ -414,6 +506,64 @@ export default function ChatWindow() {
     }
   };
 
+  // ===== Hành động nhóm: rời nhóm / kick / xem thành viên =====
+  const leaveRoom = async () => {
+    if (!selectedRoom?.id || !sessionUid) return;
+    if (isOwner) {
+      Modal.warning({
+        title: "Bạn là chủ phòng",
+        content: "Hãy chuyển quyền/chỉ định chủ khác trước khi rời nhóm.",
+      });
+      return;
+    }
+    Modal.confirm({
+      title: "Rời nhóm?",
+      content: `Bạn sẽ rời phòng "${selectedRoom?.name}"`,
+      okText: "Rời nhóm",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await firebase
+            .firestore()
+            .collection("rooms")
+            .doc(selectedRoom.id)
+            .update({
+              members: firebase.firestore.FieldValue.arrayRemove(sessionUid),
+            });
+          antdMessage.success("Đã rời nhóm");
+          setSelectedRoomId?.("");
+        } catch (e) {
+          console.error(e);
+          antdMessage.error(e?.message || "Không rời nhóm được");
+        }
+      },
+    });
+  };
+
+  const kickMember = async (uid, name) => {
+    if (!isOwner || !uid || uid === ownerUid) return;
+    Modal.confirm({
+      title: `Loại ${name || "thành viên"} khỏi nhóm?`,
+      okText: "Loại khỏi nhóm",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await firebase
+            .firestore()
+            .collection("rooms")
+            .doc(selectedRoom.id)
+            .update({
+              members: firebase.firestore.FieldValue.arrayRemove(uid),
+            });
+          antdMessage.success(`Đã loại ${name || "thành viên"}`);
+        } catch (e) {
+          console.error(e);
+          antdMessage.error(e?.message || "Không thể loại thành viên");
+        }
+      },
+    });
+  };
+
   // Menu đính kèm (ảnh / video)
   const attachMenu = {
     items: [
@@ -432,13 +582,30 @@ export default function ChatWindow() {
               <div className="header__info">
                 <p className="header__title">{selectedRoom.name}</p>
                 <span className="header__description">{selectedRoom.description}</span>
+                {ownerUid && (
+                  <span style={{ fontSize:12, color:"#666" }}>
+                    Chủ phòng: {ownerUid === sessionUid ? "Bạn" : ownerUid}
+                  </span>
+                )}
               </div>
+
               <ButtonGroupStyled>
                 <Button icon={<PhoneOutlined />} type="text" onClick={() => setCallOpen(true)}>Call</Button>
                 <Button icon={<UserAddOutlined />} type="text" onClick={() => setIsInviteMemberVisible(true)}>Mời</Button>
+
+                {/* Xem thành viên */}
+                <Button type="text" onClick={() => setMembersOpen(true)}>Thành viên</Button>
+
+                {/* Rời nhóm */}
+                <Tooltip title={isOwner ? "Bạn là chủ phòng, không thể rời trực tiếp" : "Rời nhóm"}>
+                  <Button type="text" danger onClick={leaveRoom} disabled={isOwner}>
+                    Rời nhóm
+                  </Button>
+                </Tooltip>
+
                 <Avatar.Group size="small" max={{ count: 2 }}>
                   {members.map(member => (
-                    <Tooltip title={member.displayName} key={member.id}>
+                    <Tooltip title={member.displayName} key={member.id || member.uid}>
                       <Avatar src={member.photoURL}>
                         {member.photoURL ? "" : member.displayName?.charAt(0)?.toUpperCase()}
                       </Avatar>
@@ -543,14 +710,12 @@ export default function ChatWindow() {
                   </p>
                 </Upload.Dragger>
 
-                {/* ALERT lỗi quá dung lượng trong modal */}
                 {sizeError && (
                   <div style={{ marginTop: 12 }}>
                     <Alert type="error" showIcon message={sizeError} />
                   </div>
                 )}
 
-                {/* PREVIEW */}
                 {previewUrl && !uploading && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ fontSize:12, color:"#666", marginBottom:6 }}>
@@ -585,6 +750,47 @@ export default function ChatWindow() {
 
             </ContentStyled>
           </div>
+
+          {/* Modal: Danh sách thành viên */}
+          <Modal
+            title={`Thành viên (${members.length})`}
+            open={membersOpen}
+            onCancel={() => setMembersOpen(false)}
+            footer={null}
+          >
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {members.map((m) => {
+                const isMe = m.uid === sessionUid || m.id === sessionUid;
+                const canKick = isOwner && !isMe;
+                return (
+                  <div key={m.id || m.uid} style={{
+                    display:"flex", alignItems:"center", justifyContent:"space-between",
+                    border:"1px solid #eee", padding:"6px 10px", borderRadius:8
+                  }}>
+                    <Space>
+                      <Avatar size="small" src={m.photoURL}>
+                        {m.photoURL ? "" : m.displayName?.charAt(0)?.toUpperCase()}
+                      </Avatar>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{m.displayName || m.uid}</div>
+                        <div style={{ fontSize: 12, color: "#999" }}>{m.email || m.uid}</div>
+                      </div>
+                    </Space>
+
+                    {ownerUid && (m.uid === ownerUid) && (
+                      <span style={{ fontSize: 12, color: "#1677ff" }}>Chủ phòng</span>
+                    )}
+
+                    {canKick && (
+                      <Button danger size="small" onClick={() => kickMember(m.uid, m.displayName)}>
+                        Kick
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Modal>
         </>
       ) : (
         <Alert message="Chọn phòng để được chat" type="info" showIcon style={{ margin: 5 }} closable />
